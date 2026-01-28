@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
-import { ref, computed } from "vue";
+import { computed, ref } from "vue";
+import { parseAmount } from "@/lib/utils";
 
 export interface OrderItem {
   id: string;
@@ -23,24 +24,121 @@ export interface PdfInfo {
   currency: string;
 }
 
+export type DisplayItem = OrderItem & {
+  _mergeCount?: number;
+};
+
+function formatNumber(value: number, decimals: number): string {
+  if (!Number.isFinite(value)) return "0";
+  return value.toFixed(decimals);
+}
+
+function getQtyLabel(item: OrderItem): string {
+  const raw = item.数量?.trim();
+  if (raw) return raw;
+  return formatNumber(parseAmount(item.数量), 2);
+}
+
+function formatMergedDates(items: OrderItem[], field: "计划交货日期" | "订单交期"): string {
+  const dates = items.map((item) => (item[field] || "").trim());
+  const nonEmpty = dates.filter(Boolean);
+  const unique = new Set(nonEmpty);
+  if (nonEmpty.length === items.length && unique.size === 1) {
+    return nonEmpty[0];
+  }
+  return items
+    .map((item, index) => `${dates[index] || "-"}(${getQtyLabel(item)})`)
+    .join(", ");
+}
+
+function mergeByPartNo(source: OrderItem[]): DisplayItem[] {
+  const groups = new Map<
+    string,
+    {
+      key: string;
+      base: OrderItem;
+      items: OrderItem[];
+      totalQty: number;
+      totalAmount: number;
+      totalPriceAmount: number;
+    }
+  >();
+
+  for (const item of source) {
+    const partNo = item.零件号?.trim();
+    const key = partNo || item.id;
+    const qty = parseAmount(item.数量);
+    const price = parseAmount(item.价格);
+    const amount = parseAmount(item.金额);
+
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        key,
+        base: { ...item },
+        items: [],
+        totalQty: 0,
+        totalAmount: 0,
+        totalPriceAmount: 0,
+      };
+      groups.set(key, group);
+    }
+
+    group.items.push(item);
+
+    group.totalQty += qty;
+    const computedAmount = amount || qty * price;
+    group.totalAmount += computedAmount;
+    group.totalPriceAmount += qty * price;
+  }
+
+  return Array.from(groups.values()).map((group) => {
+    if (group.items.length <= 1) {
+      return {
+        ...group.base,
+        _mergeCount: 1,
+      };
+    }
+
+    const mergedPrice =
+      group.totalQty > 0 ? group.totalPriceAmount / group.totalQty : 0;
+    return {
+      ...group.base,
+      id: group.key,
+      数量: formatNumber(group.totalQty, 2),
+      价格: formatNumber(mergedPrice, 6),
+      金额: formatNumber(group.totalAmount, 4),
+      计划交货日期: formatMergedDates(group.items, "计划交货日期"),
+      订单交期: formatMergedDates(group.items, "订单交期"),
+      _mergeCount: group.items.length,
+    };
+  });
+}
+
 export const usePdfStore = defineStore("pdf", () => {
   // State
   const items = ref<OrderItem[]>([]);
   const pdfInfo = ref<PdfInfo | null>(null);
   const isLoading = ref(false);
   const filePath = ref("");
+  const mergeSamePartNo = ref(false);
 
   // Getters
   const hasData = computed(() => items.value.length > 0);
+  const mergedItems = computed(() => mergeByPartNo(items.value));
+  const displayItems = computed(() =>
+    mergeSamePartNo.value ? mergedItems.value : items.value
+  );
+  const exportItems = computed(() => displayItems.value);
   const totalAmount = computed(() => {
     return items.value.reduce((sum, item) => {
-      const amount = parseFloat(item.金额.replace(/,/g, "")) || 0;
+      const amount = parseAmount(item.金额);
       return sum + amount;
     }, 0);
   });
   const totalQuantity = computed(() => {
     return items.value.reduce((sum, item) => {
-      const qty = parseFloat(item.数量.replace(/,/g, "")) || 0;
+      const qty = parseAmount(item.数量);
       return sum + qty;
     }, 0);
   });
@@ -95,14 +193,21 @@ export const usePdfStore = defineStore("pdf", () => {
     isLoading.value = loading;
   }
 
+  function setMergeSamePartNo(merge: boolean) {
+    mergeSamePartNo.value = merge;
+  }
+
   return {
     // State
     items,
     pdfInfo,
     isLoading,
     filePath,
+    mergeSamePartNo,
     // Getters
     hasData,
+    displayItems,
+    exportItems,
     totalAmount,
     totalQuantity,
     // Actions
@@ -114,5 +219,6 @@ export const usePdfStore = defineStore("pdf", () => {
     clearData,
     setFilePath,
     setLoading,
+    setMergeSamePartNo,
   };
 });

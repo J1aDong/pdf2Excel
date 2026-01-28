@@ -28,7 +28,7 @@
     <!-- Main Content -->
     <main class="flex-1 p-6 overflow-hidden flex flex-col">
       <!-- Info Cards -->
-      <div v-if="pdfInfo" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+      <div v-if="pdfInfo" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <Card>
           <CardHeader class="pb-2">
             <CardDescription>订单号</CardDescription>
@@ -45,12 +45,6 @@
           <CardHeader class="pb-2">
             <CardDescription>供应商</CardDescription>
             <CardTitle class="text-lg truncate">{{ pdfInfo.supplierName || "-" }}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader class="pb-2">
-            <CardDescription>货币</CardDescription>
-            <CardTitle class="text-lg">{{ pdfInfo.currency || "-" }}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -110,7 +104,7 @@ import AlertDescription from "./components/ui/AlertDescription.vue";
 import DataTable from "./components/DataTable.vue";
 
 const store = usePdfStore();
-const { hasData, pdfInfo, isLoading } = storeToRefs(store);
+const { hasData, pdfInfo, isLoading, exportItems } = storeToRefs(store);
 
 const errorMessage = ref("");
 const isExporting = ref(false);
@@ -164,7 +158,7 @@ async function exportExcel() {
     if (savePath) {
       await invoke("export_excel", {
         path: savePath,
-        data: store.items,
+        data: exportItems.value,
         info: pdfInfo.value,
       });
       
