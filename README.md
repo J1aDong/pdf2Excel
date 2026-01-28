@@ -110,35 +110,38 @@ npm run tauri:build
 # 输出：src-tauri/target/release/bundle/msi/*.msi
 ```
 
-## 嵌入式 Python 配置
+## 嵌入式 Python 配置（打包使用）
 
-### macOS
-使用系统 Python（已预装），无需额外配置。
+打包时使用内置 Python 运行时，**宿主不需要单独安装 Python**。
 
-### Windows
-需要下载嵌入式 Python：
+### 一键准备（推荐）
+macOS/Linux：
+```bash
+chmod +x prepare-embedded-python.sh
+./prepare-embedded-python.sh
+```
 
-1. 下载 Windows embeddable package:
-   ```
-   https://www.python.org/downloads/windows/
-   # 选择 Windows installer (64-bit) 或 embeddable package
-   ```
+Windows（PowerShell）：
+```powershell
+.\prepare-embedded-python.ps1
+```
 
-2. 解压到 `src-tauri/resources/python/`:
-   ```
-   src-tauri/resources/python/
-   ├── python.exe
-   ├── python310.dll
-   └── ...
-   ```
+脚本会下载可迁移 Python，并安装依赖到：
+```
+src-tauri/resources/python/
+```
 
-3. 安装依赖:
-   ```bash
-   cd src-tauri/resources/python
-   ./python.exe -m pip install pdfplumber openpyxl
-   ```
+### Git LFS 提交提示（强烈推荐）
+嵌入式 Python 体积较大，建议用 Git LFS 管理：
+```bash
+git lfs install
+git lfs track "pdf2excel/src-tauri/resources/python/**"
+git add .gitattributes
+git add pdf2excel/src-tauri/resources/python
+git commit -m "Add embedded python (LFS)"
+```
 
-4. 配置 tauri.conf.json 包含 Python 运行时（已配置）
+CI 默认会拉取 LFS，并在缺失时自动运行 `prepare-embedded-python.*`。
 
 ## 核心实现
 

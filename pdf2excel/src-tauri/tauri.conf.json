@@ -37,7 +37,8 @@
     ],
     "resources": {
       "resources/pdf_processor.py": "pdf_processor.py",
-      "resources/requirements.txt": "requirements.txt"
+      "resources/requirements.txt": "requirements.txt",
+      "resources/python": "python"
     }
   }
 }
