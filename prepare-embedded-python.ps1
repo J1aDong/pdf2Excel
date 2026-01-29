@@ -15,10 +15,10 @@ if (-not (Get-Command tar -ErrorAction SilentlyContinue)) {
   Die "Missing required command: tar"
 }
 
-$PythonVersion = if ($env:PYTHON_VERSION) { $env:PYTHON_VERSION } else { "3.11.9" }
-$PythonTag = if ($env:PYTHON_BS_TAG) { $env:PYTHON_BS_TAG } else { "20240224" }
-$Asset = "cpython-$PythonVersion+$PythonTag-x86_64-pc-windows-msvc-shared-install_only.tar.gz"
-$PythonUrl = if ($env:PYTHON_URL) { $env:PYTHON_URL } else { "https://github.com/indygreg/python-build-standalone/releases/download/$PythonTag/$Asset" }
+# Use Python.org embedded distribution
+$PythonVersion = if ($env:PYTHON_VERSION) { $env:PYTHON_VERSION } else { "3.12.8" }
+$Asset = "python-$PythonVersion-embed-amd64.zip"
+$PythonUrl = if ($env:PYTHON_URL) { $env:PYTHON_URL } else { "https://www.python.org/ftp/python/$PythonVersion/$Asset" }
 
 Write-Host "Preparing embedded Python in: $PythonDir"
 Write-Host "Using: $PythonUrl"
@@ -31,14 +31,15 @@ New-Item -ItemType Directory -Path $TmpDir | Out-Null
 
 $Archive = Join-Path $TmpDir $Asset
 Invoke-WebRequest -Uri $PythonUrl -OutFile $Archive
-tar -xf $Archive -C $TmpDir
+Expand-Archive -Path $Archive -DestinationPath $TmpDir
 
-$PythonBin = Get-ChildItem -Path $TmpDir -Recurse -Filter python.exe | Select-Object -First 1
-if (-not $PythonBin) {
+# For Python embed, files are extracted directly to TmpDir
+$PythonBin = Join-Path $TmpDir "python.exe"
+if (-not (Test-Path $PythonBin)) {
   Die "python.exe not found in extracted archive."
 }
 
-$SrcRoot = Split-Path $PythonBin.FullName -Parent
+$SrcRoot = $TmpDir
 if (Test-Path $PythonDir) {
   Remove-Item $PythonDir -Recurse -Force
 }
@@ -46,7 +47,21 @@ New-Item -ItemType Directory -Path $PythonDir | Out-Null
 Copy-Item -Path (Join-Path $SrcRoot "*") -Destination $PythonDir -Recurse -Force
 
 $Python = Join-Path $PythonDir "python.exe"
-& $Python -m ensurepip --upgrade
+
+# For embedded Python, we need to modify python3xx._pth to enable site-packages
+$PthFile = Get-ChildItem -Path $PythonDir -Filter "*._pth" | Select-Object -First 1
+if ($PthFile) {
+  $PthContent = Get-Content $PthFile.FullName
+  $NewPthContent = $PthContent -replace "^import site$", "#import site"
+  $NewPthContent += "`r`nimport site"
+  Set-Content -Path $PthFile.FullName -Value $NewPthContent
+}
+
+# Download get-pip.py
+$GetPip = Join-Path $TmpDir "get-pip.py"
+Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $GetPip
+& $Python $GetPip
+
 & $Python -m pip install --upgrade pip
 & $Python -m pip install -r $RequirementsFile
 & $Python -c "import pdfplumber, openpyxl, pdfminer, PIL"

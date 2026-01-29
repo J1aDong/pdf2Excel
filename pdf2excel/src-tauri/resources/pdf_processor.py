@@ -77,7 +77,10 @@ def parse_pdf(path):
     """解析 PDF 文件，返回订单项列表"""
     items = []
     today = datetime.now().strftime("%Y-%m-%d")
-    
+
+    # 打印路径用于调试
+    print(f"[DEBUG] Opening PDF: {path}", file=sys.stderr)
+
     with pdfplumber.open(path) as pdf:
         full_text = ""
         for page in pdf.pages:
@@ -268,7 +271,9 @@ def export_excel(data):
 def main():
     """主函数 - 通过 STDIN 接收命令"""
     try:
-        # 读取输入
+        # 读取输入（确保使用 UTF-8 编码）
+        import io
+        sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
         input_data = sys.stdin.read()
         if not input_data:
             print(json.dumps({"error": "No input data"}), file=sys.stderr)

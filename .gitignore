@@ -1,0 +1,44 @@
+# Rust build artifacts
+pdf2excel/src-tauri/target/
+*.pdb
+*.ilk
+*.exe
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Tauri build
+pdf2excel/src-tauri/target/release/bundle/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.user
+*.code-workspace
